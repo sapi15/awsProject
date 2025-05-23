@@ -1,0 +1,313 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: The Frist Project_Global Hybrid Architecture
+
+# 스택 생성 전 파라미터에 값을 입력 할 수 있음.
+Parameters:
+  ProjectName:
+    Type: String
+    Description: Project Name
+  RegionName:
+    Type: String
+    Description: Region Name
+    AllowedValues:
+      - seoul
+      - paris
+  # PublicKeyMaterial:
+  #   Type: String
+  #   Description: Key Pair - Public Key Material
+
+Mappings:
+  CidrMap:
+    ap-northeast-2:
+      VpcCidr: 172.16.0.0/16
+      PubSn1Cidr: 172.16.1.0/24
+      PubSn2Cidr: 172.16.2.0/24
+      PriSn3Cidr: 172.16.3.0/24
+      PriSn4Cidr: 172.16.4.0/24
+    eu-west-3:
+      VpcCidr: 172.17.0.0/16
+      PubSn1Cidr: 172.17.1.0/24
+      PubSn2Cidr: 172.17.2.0/24
+      PriSn3Cidr: 172.17.3.0/24
+      PriSn4Cidr: 172.17.4.0/24
+  AmiMap:
+    ap-northeast-2:
+      Ami: ami-0f61efb6cfbcc18a4
+    eu-west-3:
+      Ami: ami-0652fa7d889bb696b
+    # openvpn:
+    #   Ami: ami-09a093fa2e3bfca5a
+  NetworkConfigMap:
+    SuperNetting:
+      sVpcCidr: 172.16.0.0/15  
+  RegionPublicKey:
+    ap-northeast-2:
+      PublicKeyMaterial: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC/gjO9NelrrWdovzuU+7ZtSO/C8vTraI60lUvntImTCO5yKGsLHotacp+UWBuqXOIAmk41V6y7Y3QQ4CdHiOAXgLgEHJrx9laXdbJMpmmur2DUlqP1uExCx6iR2kv3Px0nt0cjSU/mwXaKvEJjEtWB/uslOLtbARWBrt4YeJ2XE+MijRx2DgyiprhW2ifvSM/uPmNbs3oQVLuXQdJDdQUcniI5UyfUnHkuO8O86aZSQcX/FR6NFDSBXsYKPqW7Tk2RlX2D29Iza6aPSFZhLjEVqf6PQjpANKy+m3N1xmHGWzcScs40pvjeWqT/DpDsbD89Sd4pxfD55BXEQFODVuEr rsa-key-20250520
+    eu-west-3:
+      PublicKeyMaterial: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCX53JTNJqYJYwIQX8NcRChIK1dBliMMv7BvX0DozTuX6AfJqUtH0issn7RTe8iN/2aiBWewlTyAv7E7o5o1tjrhSMAcLBFbnUikqkmu7eLupdfYcUCs30vHymCfj11D40FxPhhbw3QT8WTDvwcUsaAZLepOyGkBbe4mAw2a1msQz7HaK4RJKB0hhd76YlqjTplnOvuMvUHgGA9Jsq5jJzofuCMT1F+9jSJAPKVBKPF+U3zYDmdJxbpEP1StoJ2NtvAgVGb1rqRo0sKP7i7eaB8urOiUg+pAfYh05oIh7NZcFgCBbBtludTf069l21wd1dSh1EPH92bb3g5uGW1AJC5 rsa-key-20250520
+
+
+
+Resources:
+  # VPC 생성
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !FindInMap [CidrMap, !Ref "AWS::Region", VpcCidr]
+      # DNS 호스트 이름 활성화
+      EnableDnsHostnames: true
+      # DNS 확인 활성화
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${RegionName}-vpc"
+  # Internet Gateway
+  Igw:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${RegionName}-igw"
+  # Vpc, Internet Gateway 연결
+  IgwAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref Igw
+
+  # Public Subnet 생성
+  PubSn1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !FindInMap [CidrMap, !Ref "AWS::Region", PubSn1Cidr]
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+      - Key: Name
+        Value: !Sub "${RegionName}-pubSn1"
+  PubSn2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !FindInMap [CidrMap, !Ref "AWS::Region", PubSn2Cidr]
+      AvailabilityZone: !Select [2, !GetAZs '']
+      Tags:
+      - Key: Name
+        Value: !Sub "${RegionName}-pubSn2"
+
+  # Private Subnet 생성     
+  PriSn3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !FindInMap [CidrMap, !Ref "AWS::Region", PriSn3Cidr]
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+      - Key: Name
+        Value: !Sub "${RegionName}-priSn3"
+  PriSn4:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !FindInMap [CidrMap, !Ref "AWS::Region", PriSn4Cidr]
+      AvailabilityZone: !Select [2, !GetAZs '']
+      Tags:
+      - Key: Name
+        Value: !Sub "${RegionName}-priSn4"
+
+  # Route table 생성 (PubSn)
+  RtPubSn12:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+      - Key: Name
+        Value: !Sub "${RegionName}-rtPubSn12"
+  # Route Table, subnet 연결
+  PubSn1RtAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PubSn1
+      RouteTableId: !Ref RtPubSn12
+  PubSn2RtAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PubSn2
+      RouteTableId: !Ref RtPubSn12
+  # Default Routing
+  RtPub12DefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: IgwAttachment
+    Properties:
+      RouteTableId: !Ref RtPubSn12
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref Igw
+
+  # Route table 생성 (PriSn)
+  RtPriSn34:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+      - Key: Name
+        Value: !Sub "${RegionName}-rtPriSn34"
+  PriSn3RtAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PriSn3
+      RouteTableId: !Ref RtPriSn34
+  PriSn4RtAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PriSn4
+      RouteTableId: !Ref RtPriSn34
+  # Default Routing
+  RtPri34DefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: Ec2Nat
+    Properties:
+      RouteTableId: !Ref RtPriSn34
+      DestinationCidrBlock: 0.0.0.0/0
+      InstanceId: !Ref Ec2Nat
+
+  # Key Pair
+  KeyNat:
+    Type: AWS::EC2::KeyPair
+    Properties:
+      KeyName: !Sub "${RegionName}-key-nat"
+      PublicKeyMaterial: !FindInMap [RegionPublicKey, !Ref AWS::Region, PublicKeyMaterial]
+
+  # NatInstance Security Group
+  SgNat:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref Vpc
+      GroupDescription: !Sub "${AWS::Region} Nat Instance Security Group"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !FindInMap [CidrMap, !Ref "AWS::Region", PubSn2Cidr]
+        - IpProtocol: icmp
+          FromPort: -1
+          ToPort: -1
+          CidrIp: !FindInMap [NetworkConfigMap, SuperNetting, sVpcCidr]
+        # - IpProtocol: icmp
+        #   FromPort: -1
+        #   ToPort: -1
+        #   CidrIp: 192.168.0.0/16          
+          # private에서 http 프로토콜을 이용하기 위해 필요
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0          
+      Tags:
+        - Key : Name
+          Value : !Sub "${RegionName}-sg-nat"
+
+  # Nat Instance 생성
+  Ec2Nat: 
+    Type: AWS::EC2::Instance
+    # Condition: Seoul
+    Properties: 
+      ImageId: !FindInMap [AmiMap, !Ref "AWS::Region", Ami]
+      InstanceType: t2.micro      
+      KeyName: !Ref KeyNat
+      NetworkInterfaces: 
+        - AssociatePublicIpAddress: true
+          DeviceIndex: 0
+          GroupSet: 
+            - Ref: SgNat
+          SubnetId: 
+            Ref: PubSn1
+      SourceDestCheck: false
+      Tags:
+        - Key : Name
+          Value : !Sub "${RegionName}-nat-instance"
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          echo "p@ssw0rd" | passwd --stdin root
+          sed -i "s/^#PermitRootLogin yes/PermitRootLogin yes/g" /etc/ssh/sshd_config
+          sed -i "s/^PasswordAuthentication no/PasswordAuthentication yes/g" /etc/ssh/sshd_config
+          systemctl restart sshd
+          echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
+          sysctl -p /etc/sysctl.conf
+          yum install -y iptables-services
+          systemctl start iptables
+          systemctl enable iptables
+          iptables -F
+          iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+          service iptables save
+
+# Outputs
+Outputs:
+  VpcId:
+    Description: The VPC ID
+    Value: !Ref Vpc
+    Export:
+      Name: VpcId
+  PubSn1Id:
+    Description: The Public Subnet1 ID
+    Value: !Ref PubSn1
+    Export:
+      Name: PubSn1Id
+  PubSn2Id:
+    Description: The Public Subnet2 ID
+    Value: !Ref PubSn2
+    Export:
+      Name: PubSn2Id
+  PriSn3Id:
+    Description: The Private Subnet3 ID
+    Value: !Ref PriSn3
+    Export:
+      Name: PriSn3Id
+  PriSn4Id:
+    Description: The Private Subnet4 ID
+    Value: !Ref PriSn4
+    Export:
+      Name: PriSn4Id
+  DeployedVpcCidr:
+    Description: The VPC CIDR block for the deployed region
+    Value: !FindInMap [CidrMap, !Ref "AWS::Region", VpcCidr]
+    Export:
+      Name: VpcCidr
+  DeployedPubSn1Cidr:
+    Description: The Public Subnet 1 CIDR block for the deployed region
+    Value: !FindInMap [CidrMap, !Ref "AWS::Region", PubSn1Cidr]
+    Export:
+      Name: PubSn1Cidr   
+  DeployedPubSn2Cidr:
+    Description: The Public Subnet 2 CIDR block for the deployed region
+    Value: !FindInMap [CidrMap, !Ref "AWS::Region", PubSn2Cidr]
+    Export:
+      Name: PubSn2Cidr       
+  DeployedPriSn3Cidr:
+    Description: The Private Subnet 3 CIDR block for the deployed region
+    Value: !FindInMap [CidrMap, !Ref "AWS::Region", PriSn3Cidr]
+    Export:
+      Name: PriSn3Cidr        
+  DeployedPriSn4Cidr:
+    Description: The Private Subnet 4 CIDR block for the deployed region
+    Value: !FindInMap [CidrMap, !Ref "AWS::Region", PriSn4Cidr]
+    Export:
+      Name: PriSn4Cidr        
+  DeployedAmiId:
+    Description: The AMI ID for the deployed region
+    Value: !FindInMap [AmiMap, !Ref "AWS::Region", Ami]
+    Export:
+      Name: AmiId 
+  SuperNetVpcCidr:
+    Description: The SuperNetting for the deployed region
+    Value: !FindInMap [NetworkConfigMap, SuperNetting, sVpcCidr]
+    Export:
+      Name: sVpcCidr 
+
+
+
+...
