@@ -1,0 +1,322 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: The Frist Project_Global Hybrid Architecture
+
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: Project Name
+  RegionName:
+    Type: String
+    Description: Region Name
+    AllowedValues:
+      - seoul
+      - paris
+  # 스택 생성 전 PublicKeyMaterial 값을 직접 기입.  
+  # PublicKeyMaterial:
+  #   Type: String
+  #   Description: Key Pair - Public Key Material
+
+Mappings:
+  RegionPublicKey:
+    ap-northeast-2:
+      BastionPublicKeyMaterial: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCgqcfeGnohUpoPuTcBlSE/bUhrw/AG10rQhZa5OIl9s1K0rMF10BgcrixL6lFIxZiLL6L723u154hgA+EkCHSax4GIUujvku5163IJiXPJCyoN1HDyypWhxGFkh8J0MqMDhknOay4C5kVs4QXxsecwwLh1kWY1M8U6JMWc/ojQOd7We9fgAs7r2bbLYrqXoQukVMiGKat1xIE/DhdLrVI02qleZIRacvWke11tHdBcly7s8WtyfqmzPagdaaMputd2M+PZWZZCF4p7MrhfsVB3E5zHcaezbeCl2islXhTWMURVfbntY4sLb8Npgt7fvE32Sb8or5dQfONCirnH0x3t rsa-key-20250520
+      WebPublicKeyMaterial: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCAd/JNKakI7pjxhGBozfkVshF22b/uYlXgHiNNMWfnSZzNrOejD59s7/FhFKFptoTcHBEC3YclDPak4Ra3Kosp5VtjM1BYwBqOObly1NWzOhT7hsFYUg+Q60ug0RCNlht0bOp1q8P3V5t8lMOo6zRXmrSny7WIMyam8rLjhqlFvp+Ixh2biygqCTogy0jiwfZqSIhnUdsuAs3o7FW5rBrukScX+Wv96V1oRF0h2rze0r68y8VsbwCGsZaES3ChhJnuGEfYMevfwi9RYaJ6DJhBTLHy78qh6aQhO3/WDFwVVibHsLdv7KVWvp544qtr1b40nxhLGlaYmTPr6WGqQvZd rsa-key-20250520
+    eu-west-3:
+      BastionPublicKeyMaterial: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDbRzaSBFgUev2XnSS9Yz0ULLGxhhGMXP6UDaCgt4QYRTsDEk1MzpR9YL8V+iQgfDOK2U4DL5gjDMrrLdTZhKuTyzzY+Smq1ugP3W7q/pV4Ge0eRPPKc+R+2Lhl0/Z17oHvWsXyr5DwrVrn07wQTtoMxJPp2gRf1/4+gfb6cNAv69YiUvPA+tDlc56PMYiTYN0FK0R4R3nWk5VF7YqFCvaOmZn4pgJLcVJMA2Ck0dNby5E8JteGdZKxrV6wAsrspErIEIy+sdnDfmny1DXC/nXjBy7V8W7D3/wg+N3aBDz0K/Zt42QzLOwFsQzBPg6FHJt8hctyD7SPfbXu4Xgneu13 rsa-key-20250520
+      WebPublicKeyMaterial: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDLfIVcPKnrBiuwKvt1cdLw5bw2bw6xlU1Y4GCFIOaYX1afNHAcoqsWEifV/LM19BPMd+AxxZL9l9i1aKZ9dpYjVi/3uYLbq7Nca/8Tntuo5TK8JuhzaLGyy7jxXRB1Hxzi0/5TYFse78ka4PS5+/6hGG5aaikxNIOrt12jpT3bccE0MkSteFKKZHZXVkyingaRvnislS2cKGkBODrITSqz9TNavLrJBw9Oh+fmvQucmHob8UQDiM8B18jWUNovvtMTmp/hTZecDLBjWUBPY29y1FBuT3BoFpmvpjXiF7kKav5j54emHgKDZRgNnDq1vavH/BS2c2q0nsLJpKy6UJVv rsa-key-20250520
+
+# 조건 정의
+Conditions:
+  Seoul: !Equals [!Ref "AWS::Region", "ap-northeast-2"]
+  Paris: !Equals [!Ref "AWS::Region", "eu-west-3"]
+
+
+
+Resources:
+  # Key pair
+  KeyBasion:
+    Type: AWS::EC2::KeyPair
+    Properties:
+      KeyName: !Sub "${RegionName}-key-bastion"
+      PublicKeyMaterial: !FindInMap [RegionPublicKey, !Ref AWS::Region, BastionPublicKeyMaterial]
+  KeyWeb:
+    Type: AWS::EC2::KeyPair
+    Properties:
+      KeyName: !Sub "${RegionName}-key-web"
+      PublicKeyMaterial: !FindInMap [RegionPublicKey, !Ref AWS::Region, WebPublicKeyMaterial]    
+
+  # Bastion Security Group
+  SgBastion:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Bastion Instance Security Group
+      VpcId: !ImportValue VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          # CidrIp: 121.160.41.37/32
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: icmp
+          FromPort: -1
+          ToPort: -1
+          CidrIp: !ImportValue sVpcCidr
+          # CidrIp: 172.16.0.0/15
+        - IpProtocol: icmp
+          FromPort: -1
+          ToPort: -1
+          CidrIp: 192.168.0.0/16      
+      Tags:
+        - Key : Name
+          Value : !Sub "${RegionName}-sg-bastion"
+
+  # Bastion Instance 생성
+  Ec2Bastion:
+    Type: AWS::EC2::Instance
+    # Conditions: Seoul
+    Properties: 
+      ImageId: !ImportValue AmiId
+      InstanceType: t2.micro
+      KeyName: !Ref KeyBasion
+      NetworkInterfaces: 
+        - AssociatePublicIpAddress: true
+          DeviceIndex: 0
+          GroupSet: 
+            - Ref: SgBastion
+          SubnetId: !ImportValue PubSn2Id
+      Tags:
+        - Key : Name
+          Value : !Sub "${RegionName}-bastion-instance"
+      # UserData:
+      #   Fn::Base64: |
+      #     #!/bin/bash
+      #     # echo "p@ssw0rd" | passwd --stdin root
+      #     # sed -i "s/^#PermitRootLogin yes/PermitRootLogin yes/g" /etc/ssh/sshd_config
+      #     # sed -i "s/^PasswordAuthentication no/PasswordAuthentication yes/g" /etc/ssh/sshd_config
+      #     # systemctl restart sshd
+
+  # 대상 그룹
+  TgWeb:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "${RegionName}-tg-web"
+      Port: 80
+      Protocol: HTTP
+      HealthCheckPath: '/index.php'
+      HealthCheckIntervalSeconds: 10
+      HealthyThresholdCount: 3
+      UnhealthyThresholdCount: 3
+      VpcId: !ImportValue VpcId
+      Tags:
+        - Key : Name
+          Value : !Sub "${RegionName}-tg-web"          
+
+  # Web Application Load Balancer 
+  SgWebAlb:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !ImportValue VpcId
+      GroupDescription: !Sub "${AWS::Region} Web ALB Security Group"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key : Name
+          Value : !Sub "${RegionName}-sg-webAlb"
+  WebAlb:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internet-facing
+      Name: !Sub "${RegionName}-web-alb"
+      SecurityGroups:
+        - !Ref SgWebAlb
+      Subnets:
+        - !ImportValue PubSn1Id
+        - !ImportValue PubSn2Id
+  # 리스너_ 대상그룹 연결?
+  WebAlbListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TgWeb
+      LoadBalancerArn: !Ref WebAlb
+      Port: 80
+      Protocol: HTTP
+
+  # Private Service Security Group
+  SgWeb:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !ImportValue VpcId
+      GroupDescription: !Sub "${AWS::Region} Web Instance Security Group"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !ImportValue PubSn2Cidr
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: icmp
+          FromPort: -1
+          ToPort: -1
+          CidrIp: !ImportValue sVpcCidr
+          # CidrIp: 172.16.0.0/15
+        - IpProtocol: icmp
+          FromPort: -1
+          ToPort: -1
+          CidrIp: 192.168.0.0/16
+      Tags:
+        - Key : Name
+          Value : !Sub "${RegionName}-sg-web"      
+
+  # 시작 탬플릿
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub "${RegionName}-lt"
+      VersionDescription: version 1.0
+      LaunchTemplateData:
+        ImageId: !ImportValue AmiId
+        InstanceType: t2.micro
+        KeyName: !Ref KeyWeb
+        SecurityGroupIds:
+          - !Ref SgWeb
+        UserData:
+          Fn::Base64: |
+            #!/bin/bash
+            sudo yum install -y httpd php mariadb-server php-mysqli
+            sudo systemctl start httpd && sudo systemctl enable httpd
+            sudo systemctl start mariadb && sudo systemctl enable mariadb
+            sed -i -e 's/    DirectoryIndex index.html/    DirectoryIndex index.php index.html/g'  /etc/httpd/conf/httpd.conf
+            instance_id=$(ec2-metadata -i)
+            private_ip=$(ec2-metadata -o)
+            az_name=$(ec2-metadata -z)
+            TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+            RAW_REGION_CODE=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/dynamic/instance-identity/document | grep region | awk -F\" '{print $4}')
+            case "$RAW_REGION_CODE" in
+              "ap-northeast-2")
+                FRIENDLY_REGION_NAME="Seoul"
+                ;;
+              "eu-west-3")
+                FRIENDLY_REGION_NAME="Paris"
+                ;;
+              *)
+                FRIENDLY_REGION_NAME="$RAW_REGION_CODE" # 매핑되지 않은 경우 코드 그대로 사용
+                ;;
+            esac
+            cat<< EOF > /var/www/html/index.php
+              <!DOCTYPE html>
+                <html lang="ko">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>${FRIENDLY_REGION_NAME} Region Page</title>
+                    <style>
+                        /* 기본적인 CSS 스타일을 여기에 추가할 수 있습니다. */
+                        body {
+                            font-family: sans-serif;
+                            line-height: 1.6;
+                            margin: 20px;
+                        }
+                        header, footer {
+                            background-color: #f4f4f4;
+                            padding: 10px;
+                            text-align: center;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <header>
+                        <h1>Welcome to ${FRIENDLY_REGION_NAME} Region Web Server</h1>
+                        <nav>
+                            </nav>
+                    </header>
+                    <main>
+                        <h2>
+                          <?php
+                          /*
+                            \$servername = "192.168.1.140";  // DB 서버의 프라이빗 IP
+                            \$username = "idcUser";
+                            \$password = "p@ssw0rd";
+                            \$dbname = "idcTestDB";
+
+                            \$conn = new mysqli(\$servername, \$username, \$password, \$dbname);
+                            if (\$conn->connect_error) {
+                                die("MySQL 연결 실패: " . \$conn->connect_error);
+                            }
+
+                            \$sql = "select now() as db_date";
+                            \$result = \$conn->query(\$sql);
+                            if(\$result && \$result->num_rows > 0){
+                              \$row = \$result->fetch_assoc();
+                              \$db_time = \$row["db_date"];
+                              echo "<p>** IDC센터 DB의 현재 시간: " . htmlspecialchars(\$db_time) . " **</p>";
+                            }else{
+                              echo "<p>DB 준비 중</p>";
+                            }
+
+                            \$conn->close();
+                            */
+                          ?>
+                        </h2>
+                        <section>
+                            <h3>하위 섹션 1</h3>
+                            <p>
+                              <h3>${instance_id}</h3>
+                              <h3>${private_ip}</h3>
+                              <h3>${az_name}</h3>
+                              <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/9/93/Amazon_Web_Services_Logo.svg/512px-Amazon_Web_Services_Logo.svg.png" width=100>
+                            </p>
+                        </section>
+                        <section>
+                            <h3>하위 섹션 2</h3>
+                            <p>하위 섹션 내용...</p>
+                        </section>
+                    </main>
+                    <footer>
+                        <p>&copy; <?php echo date("Y"); ?> www.dck.world</p>
+                    </footer>
+                    </body>
+                </html>
+            EOF
+            sudo systemctl restart httpd
+
+  # Auto Scaling Group
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: !Sub "${RegionName}-asg"
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      VPCZoneIdentifier:
+        - !ImportValue PriSn3Id
+        - !ImportValue PriSn4Id
+      TargetGroupARNs:
+        - !Ref TgWeb
+      DesiredCapacity: 2
+      MinSize: 2
+      MaxSize: 4
+      Tags:
+        - Key: Name 
+          Value: !Sub "${RegionName}-asg-web" 
+          PropagateAtLaunch: true # Auto Scaling 그룹에 의해 시작되는 인스턴스에 이 태그를 적용할지 여부
+
+
+
+...
