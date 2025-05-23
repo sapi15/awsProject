@@ -1,0 +1,295 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: The Frist Project_Global Hybrid Architecture
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: Project Name
+  RegionName:
+    Type: String
+    Description: Region Name
+    AllowedValues:
+      - seoul
+      - paris
+
+Mappings:
+  CidrMap:
+    ap-northeast-2:
+      VpcCidr: 192.168.0.0/16
+      PubSn1Cidr: 192.168.1.0/24
+      PriSn2Cidr: 192.168.2.0/24
+      PriSn3Cidr: 192.168.3.0/24
+    # eu-west-3:
+    #   VpcCidr: 172.17.0.0/16
+    #   PubSn1Cidr: 172.16.1.0/24
+    #   PriSn2Cidr: 172.16.4.0/24
+  AmiMap:
+    ap-northeast-2:
+      Ami: ami-0f61efb6cfbcc18a4
+    # eu-west-3:
+    #   Ami: ami-0652fa7d889bb696b
+  RegionPublicKey:
+    ap-northeast-2:
+      PublicKeyMaterial: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCQD14JPEkEddK6IRnRA/9v4+oy7EdmxM1iErioweEig5yb2fLa1e50JYRp2QZsYv2wrH0o06geNKkFuyQ5G2s7qT3xzNgdQDhxQXoLm0UghTh9KskyX+Pqzh0odHra/gHfs5YeqeUVXsmLawRUU3j8cis1tVs5jM9LgxVuHExfxMGs5YWLNs3p76a8PE/3d5e2KB4qQDW7ycP+g9tk2/Id9Ib0w8MMUvwC4BMh2pqRKDqfDP3M5XYx8UIznm+eQTDeL1zsT3tlwym1hfcsZ0N6dnunTrokhKXSm7eBxYSRRx5d9e/4J1XUVpd0MQrAHkWEtRpKfRdTuJYvGKJVObYz rsa-key-20250521
+      PrivateKeyMaterial: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCfhZGr8fszZA5IRc5WZ+COFSGCB5C4MJvIJtPbhRWpoNrZjCP164lAyREn0EzZPZ4H9YBpCgHxbMuf7tr4624mvVj9UMMDU2CwJdtZEAM/cDc4/V4qNTcnlMht+4ZkROHaGNttTR+JlDkYfDU3Mg4fXbtpl0ThuPBgf3GQys/sZIewwK2Pxp1/tfo/2SR2C2z390M/lhFI5i22wVMF+nTl7n9PoIxJT1AbYKrMfmuokBxwd4bY+irjK4R2L4OgDj5oCesIU2McQTGvlvaSEAIuPeqLY8GrGFjo42bGbozZIx29leo8wA/XmwKNyK4tV4VNAAy0AuIet40B6r9Pl4HJ rsa-key-20250521
+    # eu-west-3:
+    #   PublicKeyMaterial: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDPACZ6Qu3aKa7oRie+WGvhBsZ4RyeK/lz5u6DyTbwMigdkBRo8zqzbcFqo35rLawiXviQS6DZ4wQGeiMZiJzLit6SYjMpP3u/QP0UyR8V+ZlzkWidscSrPCJoUJ4o1jKC1AKr2OhHfr8+bPyaGba6mjA3LHu1szmXUHBpY/ZlDgG3TkQcVuXcLAUsJxBaaNn7sYD10LlS5pN8q/kZ2BLIlk3FPFEQWaOlJ2KwiEaqPTOWFFM5BVNn0VXlpPAoBV4II2E2EXxCLUUBTjvBZVo1Q9sA6089Y23rAkLtmyFujHzWe2hCm6KPF6N43yh0M0Ot+Vkcz8Y72rtWcgT+mFOeP rsa-key-20250521
+
+
+Resources:
+  # VPC
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !FindInMap [CidrMap, !Ref "AWS::Region", VpcCidr]
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${RegionName}-vpc-idc"
+  Igw:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${RegionName}-igw-idc"
+  IgwAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref Igw
+
+  # Subnet
+  PubSn1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !FindInMap [CidrMap, !Ref "AWS::Region", PubSn1Cidr]
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+      - Key: Name
+        Value: !Sub "${RegionName}-pubSn1-idc"
+  PriSn2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !FindInMap [CidrMap, !Ref "AWS::Region", PriSn2Cidr]
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+      - Key: Name
+        Value: !Sub "${RegionName}-PriSn2-idc"        
+  PriSn3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !FindInMap [CidrMap, !Ref "AWS::Region", PriSn3Cidr]
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+      - Key: Name
+        Value: !Sub "${RegionName}-PriSn3-idc"       
+
+  # RouteTable(Public)
+  RtPubSn1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+      - Key: Name
+        Value: !Sub "${RegionName}-rtPubSn1-idc"
+  # Route Table, subnet 연결
+  PubSn1RtAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PubSn1
+      RouteTableId: !Ref RtPubSn1
+  # Default Routing
+  RtPub1DefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: IgwAttachment
+    Properties:
+      RouteTableId: !Ref RtPubSn1
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref Igw      
+
+  # RouteTable(Private)
+  RtPriSn23:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+      - Key: Name
+        Value: !Sub "${RegionName}-rtPriSn23-idc"
+  # Route Table, subnet 연결
+  PriSn2RtAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PriSn2
+      RouteTableId: !Ref RtPriSn23
+  PriSn3RtAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PriSn3
+      RouteTableId: !Ref RtPriSn23
+  # Default Routing
+  RtPri23DefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: NatGateway
+    Properties:
+      RouteTableId: !Ref RtPriSn23
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway      
+
+  # NatGateway
+  NatGatewayEIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: Vpc
+      Tags:
+       - Key: Name
+         Value: !Sub "${RegionName}-natEip-idc"
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGatewayEIP.AllocationId
+      SubnetId: !Ref PubSn1
+      Tags:
+        - Key: Name
+          Value: !Sub "${RegionName}-nat-idc"
+
+  # KeyPair
+  KeyIdcCGW:
+    Type: AWS::EC2::KeyPair
+    Properties:
+      KeyName: !Sub "${RegionName}-key-idcCgw"
+      PublicKeyMaterial: !FindInMap [RegionPublicKey, !Ref AWS::Region, PublicKeyMaterial]
+  KeyIdcPub:
+    Type: AWS::EC2::KeyPair
+    Properties:
+      KeyName: !Sub "${RegionName}-key-idcPub"
+      PublicKeyMaterial: !FindInMap [RegionPublicKey, !Ref AWS::Region, PrivateKeyMaterial]
+
+  # IDC CGW SecurityGroup
+  SgIdcCgw:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref Vpc
+      GroupDescription: !Sub "${AWS::Region} IDC CGW Security Group"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !ImportValue sVpcCidr
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0  # 로컬 접속 주소 넣을 곳          
+          # CidrIp: 172.16.0.0/15
+        - IpProtocol: icmp
+          FromPort: -1
+          ToPort: -1
+          CidrIp: !ImportValue sVpcCidr
+        - IpProtocol: icmp
+          FromPort: -1
+          ToPort: -1
+          CidrIp: !FindInMap [CidrMap, !Ref "AWS::Region", VpcCidr]   
+          # CidrIp: 172.16.0.0/15
+        - IpProtocol: udp
+          FromPort: 4500
+          ToPort: 4500
+          # 여기는 openswan 가이드의 right의 주소값을 넣어줘야 올바름.
+          # right 에 있는 값이 Tunnel의 주소인 듯.
+          CidrIp: 0.0.0.0/0 
+          # VPN 터널 협상의 시작과 핵심 과정을 담당하기에 반드시 open
+        - IpProtocol: udp
+          FromPort: 500
+          ToPort: 500
+          # 여기는 openswan 가이드의 right의 주소값을 넣어줘야 올바름.
+          # right 에 있는 값이 Tunnel의 주소인 듯.
+          CidrIp: 0.0.0.0/0          
+      Tags:
+        - Key : Name
+          Value : !Sub "${RegionName}-sg-idcCgw"
+
+  # IDC CGW instance 생성
+  Ec2IdcCgw: 
+    Type: AWS::EC2::Instance
+    # Condition: Seoul
+    Properties: 
+      ImageId: !FindInMap [AmiMap, !Ref "AWS::Region", Ami]
+      InstanceType: t2.micro      
+      KeyName: !Ref KeyIdcCGW
+      NetworkInterfaces: 
+        - AssociatePublicIpAddress: true
+          DeviceIndex: 0
+          GroupSet: 
+            - Ref: SgIdcCgw
+          SubnetId: 
+            Ref: PubSn1
+      SourceDestCheck: false
+      Tags:
+        - Key : Name
+          Value : !Sub "${RegionName}-idcCgw-instance"
+
+  # IDC DB SecurityGroup
+  SgIdcDB:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref Vpc
+      GroupDescription: !Sub "${AWS::Region} IDC DB Server Security Group"
+      SecurityGroupIngress:
+        # - IpProtocol: tcp
+        #   FromPort: 22
+        #   ToPort: 22
+        #   CidrIp: !ImportValue sVpcCidr
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !FindInMap [CidrMap, !Ref "AWS::Region", VpcCidr]   
+          # CidrIp: 172.16.0.0/15
+        - IpProtocol: icmp
+          FromPort: -1
+          ToPort: -1
+          CidrIp: !ImportValue sVpcCidr
+        - IpProtocol: icmp
+          FromPort: -1
+          ToPort: -1
+          CidrIp: !FindInMap [CidrMap, !Ref "AWS::Region", VpcCidr]   
+          # CidrIp: 172.16.0.0/15
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          CidrIp: !ImportValue sVpcCidr          
+      Tags:
+        - Key : Name
+          Value : !Sub "${RegionName}-sg-IdcDB"
+
+  Ec2IdcDB: 
+    Type: AWS::EC2::Instance
+    # Condition: Seoul
+    Properties: 
+      ImageId: !FindInMap [AmiMap, !Ref "AWS::Region", Ami]
+      InstanceType: t2.micro      
+      KeyName: !Ref KeyIdcPub
+      NetworkInterfaces: 
+        - AssociatePublicIpAddress: false
+          DeviceIndex: 0
+          GroupSet: 
+            - Ref: SgIdcDB
+          SubnetId: 
+            Ref: PriSn2
+      Tags:
+        - Key : Name
+          Value : !Sub "${RegionName}-idc-DB"
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          sudo yum install -y mariadb-server
+          sudo systemctl start mariadb & sudo systemctl enable mariadb
+
+
+        
+
+
+
+...
